@@ -190,8 +190,32 @@ int main(int argc, char** argv){
 
         std::cout << "connected to " << config::host << "\n";
 
+        json::object sub;
+        sub["id"] = 1;
+        sub["cmd"] = "subscribe";
+        json::object params;
+        params["channels"] = json::array{"orderbook_delta"};
+        params["market_tickers"] = json::array{market_ticker};
+        sub["params"] = params;
 
+        ws.write(net::buffer(json::serialize(sub)));
 
+        beast::flat_buffer buffer;
+        for(;;){
+            buffer.clear();
+            ws.read(buffer);
+            const std::string raw = beast::buffers_to_string(buffer.data());
+
+            json::value parsed = json::parse(raw);
+            json::object& obj = parsed.as_object();
+
+            std::string type = "unknown"
+            if(auto* t = obj.if_contains("type"); t && t->is_string()){
+                type = std::string(t->as_string());
+            }
+
+            std::cout << "[" << type << "]" << raw << "\n";
+        }
     } catch(std::exception const& e){
         std::cerr << "Error: " << e.what() << "\n";
         return 1;
