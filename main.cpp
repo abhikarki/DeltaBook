@@ -169,6 +169,28 @@ int main(int argc, char** argv){
         // TCP connection
         beast::get_lowest_layer(ws).connect(results);
 
+        // set SNI
+        if(!SSL_set_tlsext_host_name(ws.next_layer().native_handle(), config::host)){
+            throw beast::system_error(beast::error_code(static_cast<int>(::ERR_get_error()), net::error::get_ssl_category()));
+        }
+        // TLS/SSL handshake
+        ws.next_layer().handshake(ssl::stream_base::client);
+
+        // update the request
+        ws.set_option(websocket::stream_base::decorator(
+            [&](websocket::request_type& req){
+                req.set("KALSHI-ACCESS-KEY", config::api_key_id());
+                req.set("KALSHI-ACCESS-SIGNATURE", signature);
+                req.set("KALSHI-ACCESS-TIMESTAMP", timestamp);
+            }
+        ));
+
+        const std::string host_header = std::string(config::host) + ":" + config::port;
+        ws.handshake(host_header, config::ws_path);
+
+        std::cout << "connected to " << config::host << "\n";
+
+
 
     } catch(std::exception const& e){
         std::cerr << "Error: " << e.what() << "\n";
