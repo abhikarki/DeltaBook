@@ -1,142 +1,59 @@
-#include <openssl/ssl.h>
-#include <openssl/err.h>
+#include <boost/asio/connect.hpp>
+#include <boost/asio/ip/tcp.hpp>
+#include <boost/asio/ssl/stream.hpp>
+#include <boost/beast/core.hpp>
+#include <boost/beast/ssl.hpp>
+#include <boost/beast/websocket.hpp>
+#include <boost/beast/websocket/ssl.hpp>
+#include <boost/json.hpp>
 
-#include <arpa/inet.h>
-#include <fcntl.h>
-#include <netdb.h>
-#include <poll.h>
-#include <sys/socket.h>
-#include <unistd.h>
+
+#include <openssl/bio.h>
+#include <openssl/buffer.h>
+#include <openssl/err.h>
+#include <openssl/evp.h>
+#include <openssl/pem.h>
+#include <openssl/rsa.h>
 
 #include <chrono>
-#include <cstdint>
-#include <cstdio>
 #include <cstdlib>
-#include <cstring>
 #include <iostream>
-#include <random>
+#include <stdexcept>
+#include <string>
+#include <vector>
 
-static constexpr const char *HOST = "external-api-ws.demo.kalshi.co";
-static constexpr const char *PORT = "443";
-static constexpr const char *PATH = "/trade-api/ws/v2";
+namespace beast = boost::beast;
+namespace websocket = beast::websocket;
+namespace net = boost::asio;
+namespace ssl = net::ssl;
+using tcp = net::ip::tcp;
+namespace json = boost::json;
 
-static constexpr size_t HTTP_REQ_CAP = 4096;
-static constexpr size_t HTTP_RX_CAP = 16384;
-static constexpr size_t WS_RX_CAP = 1 << 20;
-static constexpr size_t WS_TX_CAP = 1 << 16;
-static constexpr size_t MAX_WS_PAYLOAD = 1 << 20;
+namespace config{
+    constexpr const char* host = "external-api-ws.demo.kalshi.co";
+    constexpr const char* port = "443";
+    constexpr const char* ws_path = "/trade-api/ws/v2";
 
-static uint64_t now_ms(){
-    using namespace std::chrono;
-    return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
-}
-
-static bool set_nonblocking(int fd){
-    int flags = fcntl(fd, F_GETFL, 0);
-    if(flags < 0) return false;
-    return fcntl(fd, F_SETFL, flags | O_NONBLOCK) == 0;
-}
-
-static bool wait_connect_done(int fd, int timeout_ms){
-    pollfd pfd{};
-    pfd.fd = fd;
-    pfd.events = POLLOUT;
-
-    int rc = poll(&pfd, 1, timeout_ms);
-    if(rc <= 0) return false;
-
-    int so_error = 0;
-    socklen_t len = sizeof(so_error);
-    if(getsockopt(fd, SOL_SOCKET, SO_ERROR, &so_error, &len) != 0) return false;
-    if(so_error != 0){
-        errno = so_error;
-        return false;
-    }
-    return true;
-}
-
-static int connect_tcp_nonblocking(const char *host, const char *port){
-    addrinfo hints{};
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
-
-    addrinfo *res = nullptr;
-    int rc = getaddrinfo(host, port, &hints, &res);
-    if(rc != 0){
-        std::cerr << "getaddrinfo failed: " << gai_strerror(rc) << "\n";
-        return -1;
+    inline std::string api_key_id(){
+        const char* v = std::getenv("KALSHI_API_KEY_ID");
+        if(!v) throw std::runtime_error("KALSHI_API_KEY_ID is not set");
+        return v;
     }
 
-    int fd = -1;
-    for(addrinfo *it = res; it; it = it->ai_next){
-        fd = socket(it->ai_family, it->ai_socktype, it->ai_protocol);
-        if(fd < 0) continue;
-
-        if(!set_nonblocking(fd)){
-            close(fd);
-            fd = -1;
-            continue;
-        }
-
-        if(connect(fd, it->ai_addr, it->ai_addrlen) == 0){
-            freeaddrinfo(res);
-            return fd;
-        }
-
-        if(errno == EINPROGRESS){
-            freeaddrinfo(res);
-            return fd;
-        }
-
-        close(fd);
-        fd = -1;
+    inline std::string private_key_path(){
+        const char* v = std::getenv("KALSHI_PRIVATE_KEY_PATH");
+        if(!v) throw std::runtime_error("KALSHI_PRIVATE_KEY_PATH is not set");
+        return v;
     }
-
-    freeaddrinfor(res);
-    return -1;
 }
 
-int main(int argc, char **argv){
-    const char *api_key = (argc > 1) ? argv[1] : "API_KEY";
-    const char *private_key_path = (argc > 2) ? argv[2] : "PRIVATE_KEY_PEM_PATH";
-    const char *market_ticker = (argc > 3) ? argv[3] : "TICKER";
-
-    SSL_library_init();
-    SSL_load_error_strings();
-    OpenSSL_add_ssl_algorithms();
-
-    int fd = connect_tcp_nonblocking(HOST, PORT);
-
-    if(fd < 0){
-        std::cerr << "connect setup failed" << std::endl;
+int main(int argc, char** argv){
+    if(argc < 2){
+        std::cerr << "missing command line arguments" << std::endl;
         return 1;
     }
 
+    const std::string market_ticker = argv[1];
 
-    if(!wait_connect_done(fd, 10000)){
-        std::cerr << "tcp connect timeout/failure\n";
-        close(fd);
-        return 1;
-    }
-
-    SSL_CTX *ctx = SSL_CTX_new(TLS_client_method());
-    if(!ctx){
-        std::cerr << "SSL_CTX_new failed\n";
-        close(fd);
-        return 1;
-    }
-
-    SSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, nullptr);
-    SSL *ssl = SSL_new(ctx);
-    if(!ssl){
-        std::cerr << "SSL_new failed\n";
-        SSL_CTX_free(ctx);
-        close(fd);
-        return 1;
-    }
-
-    SSL_set_fd(ssl, fd);
-    SSL_set_tlsext_host_name(ssl, HOST);
-
-    
+    return 0;
 }
