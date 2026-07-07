@@ -132,6 +132,12 @@ class KalshiSigner{
         }
 };
 
+// time since Unix epoch
+std::string current_timestamp_ms(){
+    auto now = std::chrono::system_clock::now().time_since_epoch();
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
+    return std::to_string(ms);
+}
 
 
 int main(int argc, char** argv){
@@ -145,7 +151,23 @@ int main(int argc, char** argv){
     try{
         // as per the Kalshi API Docs
         KalshiSigner signer(config::private_key_path());
-       
+        const std::string timestamp = current_timestamp_ms();
+        const std::string msg_to_sign = timestamp + "GET" + config::ws_path;
+        const std::string signature = signer.sign(msg_to_sign);
+
+        net::io_context ioc;
+        ssl::context ctx{ssl::context::tlsv12_client};
+        ctx.set_default_verify_paths();
+        ctx.set_verify_mode(ssl::verify_peer);
+
+        tcp::resolver resolver{ioc};
+        // create the network stack
+        websocket::stream<beast::ssl_stream<beast::tcp_stream>> ws{ioc, ctx};
+
+        auto const results = resolver.resolve(config::host. config::port);
+
+        // TCP connection
+        beast::get_lowest_layer(ws).connect(results);
 
 
     } catch(std::exception const& e){
