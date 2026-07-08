@@ -1,4 +1,4 @@
-##DeltaBook
+## DeltaBook
 
 ## setup and compile
 ```bash
