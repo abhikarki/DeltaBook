@@ -85,13 +85,13 @@ class KalshiSigner{
             }
             if(EVP_DigestSignUpdate(ctx, message.data(), message.size()) <= 0){
                 EVP_MD_CTX_free(ctx);
-                throw std::runtime_erro("EVP_DigestSignUpdate failed: " + last_ssl_error());
+                throw std::runtime_error("EVP_DigestSignUpdate failed: " + last_ssl_error());
             }
             
             size_t sig_len = 0;
             // calling with nullptr to just query the size
             if(EVP_DigestSignFinal(ctx, nullptr, &sig_len) <= 0){
-                EVP_MD_free(ctx);
+                EVP_MD_CTX_free(ctx);
                 throw std::runtime_error("EVP_DigestSignFinal (size query) failed: " + last_ssl_error());
             }
             std::vector<unsigned char> sig(sig_len);
@@ -109,7 +109,7 @@ class KalshiSigner{
         EVP_PKEY* key_ = nullptr;
 
         // get error code and its readable form
-        static std::string last_ssl_erro(){
+        static std::string last_ssl_error(){
             char buf[256];
             unsigned long code = ERR_get_error();
             ERR_error_string_n(code, buf, sizeof(buf));
@@ -164,7 +164,7 @@ int main(int argc, char** argv){
         // create the network stack
         websocket::stream<beast::ssl_stream<beast::tcp_stream>> ws{ioc, ctx};
 
-        auto const results = resolver.resolve(config::host. config::port);
+        auto const results = resolver.resolve(config::host, config::port);
 
         // TCP connection
         beast::get_lowest_layer(ws).connect(results);
@@ -209,7 +209,7 @@ int main(int argc, char** argv){
             json::value parsed = json::parse(raw);
             json::object& obj = parsed.as_object();
 
-            std::string type = "unknown"
+            std::string type = "unknown";
             if(auto* t = obj.if_contains("type"); t && t->is_string()){
                 type = std::string(t->as_string());
             }
