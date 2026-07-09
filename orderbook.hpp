@@ -63,6 +63,7 @@ struct PriceLevel{
 struct BookTop{
     int64_t yes_bid = -1, yes_ask = -1;
     int64_t no_bid = -1, no_ask = -1;
+    bool is_synced = false;
 };
 
 class OrderBook{
@@ -103,6 +104,7 @@ class OrderBook{
 
             if(top.no_bid >= 0) top.yes_ask = PRICE_TICKS_PER_DOLLAR - top.no_bid;
             if(top.yes_bid >= 0) top.no_ask = PRICE_TICKS_PER_DOLLAR - top.yes_bid;
+            top.is_synced = synced_;
             return top;
         }   
 
