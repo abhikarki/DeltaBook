@@ -125,4 +125,24 @@ class OrderBook{
 };
 
 
+class SharedOrderBook{
+    public:
+        void update(const OrderBookDelta& d){
+            std::lock_guard<std::mutex> lock(mu_);
+            book_.apply_delta(d);
+        }
 
+        void load_snapshot(const std::vector<PriceLevel>& yes_levels, const std::vector<PriceLevel>& no_levels, uint64_t seq){
+            std::lock_guard<std::mutex> lock(mu_);
+            book_.apply_snapshot(yes_levels, no_levels, seq);
+        }
+
+        BookTop read_snapshot() const{
+            std::lock_guard<std::mutex> lock(mu_);
+            return book_.get_snapshot();
+        }
+
+    private:
+        mutable std::mutex mu_;
+        OrderBook book_;
+};
