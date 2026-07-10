@@ -1,3 +1,5 @@
+#include "orderbook.hpp"
+
 #include <boost/asio/connect.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/ssl/stream.hpp>
@@ -139,15 +141,7 @@ std::string current_timestamp_ms(){
     return std::to_string(ms);
 }
 
-
-int main(int argc, char** argv){
-    if(argc < 2){
-        std::cerr << "missing command line arguments" << std::endl;
-        return 1;
-    }
-
-    const std::string market_ticker = argv[1];
-
+void run_kalshi_feed(std::shared_prt<SharedOrderBook> book, std::string market_ticker, bool print_updates){
     try{
         // as per the Kalshi API Docs
         KalshiSigner signer(config::private_key_path());
@@ -218,8 +212,20 @@ int main(int argc, char** argv){
         }
     } catch(std::exception const& e){
         std::cerr << "Error: " << e.what() << "\n";
+    }
+}
+
+
+int main(int argc, char** argv){
+    if(argc < 2){
+        std::cerr << "missing command line arguments" << std::endl;
         return 1;
     }
+
+    std::string market_ticker = argv[1];
+
+    auto book = std::make_shared<SharedOrderBook>();
+    run_kalshi_feed(book, market_ticker, true);
 
     return 0;
 }
