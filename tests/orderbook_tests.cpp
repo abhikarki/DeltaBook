@@ -8,7 +8,7 @@ TEST_CASE("orderbook basics"){
         CHECK(parse_price("1.23456") == 12345);
         CHECK(parse_size("2.5") == 250);
         CHECK(parse_size(".5") == 50);
-        CHECK(parse_size("-0.2500") == -2500);
+        CHECK(parse_price("-0.2500") == -2500);
     }
 
     SUBCASE("snapshot sets top levels"){
