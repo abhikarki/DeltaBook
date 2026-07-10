@@ -276,7 +276,7 @@ void run_kalshi_feed(std::shared_prt<SharedOrderBook> book, std::string market_t
     }
 }
 
-
+#ifndef KALSHI_PYBIND_BUILD
 int main(int argc, char** argv){
     if(argc < 2){
         std::cerr << "missing command line arguments" << std::endl;
@@ -290,3 +290,4 @@ int main(int argc, char** argv){
 
     return 0;
 }
+#endif
