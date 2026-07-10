@@ -16,3 +16,19 @@ use the market ticker of your interest
 ```bash
 ./main_client {market_ticker}
 ```
+
+## Test
+bulld test runner using doctest and run tests:
+```bash
+make run_tests
+./run_tests
+```
+
+## python extension module
+```bash
+make kalshi_orderbook.so
+```
+verify:
+```bash
+python3 -c "import kalshi_orderbook; print(dir(kalshi_orderbook))"
+```
