@@ -31,7 +31,7 @@ inline int64_t parse_fixed(const std::string& s, int decimals){
     int64_t whole = int_part.empty() ? 0 : std::stoll(int_part);
     int64_t frac = frac_part.empty() ? 0 : std::stoll(frac_part);
     int64_t scale = 1;
-    for(int k = 0; i < decimals; k++) scale *= 10;
+    for(int k = 0; k < decimals; k++) scale *= 10;
 
     int64_t value = whole * scale + frac;
     return neg ? -value : value;

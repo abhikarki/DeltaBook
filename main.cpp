@@ -155,7 +155,7 @@ inline Side parse_side(const std::string& s){
 
 inline std::vector<PriceLevel> parse_levels(const json::array& arr){
     std::vector<PriceLevel> levels;
-    levels.reserce(arr.size());
+    levels.reserve(arr.size());
     for(auto const& entry : arr){
         auto const& pair = entry.as_array();
         levels.push_back({parse_price(std::string(pair[0].as_string())), parse_size(std::string(pair[1].as_string()))});
@@ -165,7 +165,7 @@ inline std::vector<PriceLevel> parse_levels(const json::array& arr){
 
 void handle_message(const std::string& raw, const std::shared_ptr<SharedOrderBook>& book, bool print_updates){
     json::value parsed = json::parse(raw);
-    json::object& obj = parsed.as_objectd();
+    json::object& obj = parsed.as_object();
 
     std::string type;
     if(auto* t = obj.if_contains("type"); t && t->is_string()) type = std::string(t->as_string());
@@ -207,12 +207,12 @@ void handle_message(const std::string& raw, const std::shared_ptr<SharedOrderBoo
         if(print_updates){
             BookTop top = book->read_snapshot();
             std::cout << "[delta] seq= " << seq << " yes_bid= " << top.yes_bid << " yes_ask= " << top.yes_ask   
-                      << " no_bid=" << top.no_bid << "no_ask =  " << top.no_ask << top.is_synced ? "" : " some gaps in delta stream " << "\n";
+                      << " no_bid=" << top.no_bid << "no_ask =  " << top.no_ask << (top.is_synced ? "" : " some gaps in delta stream ") << "\n";
         }
     }
 }
 
-void run_kalshi_feed(std::shared_prt<SharedOrderBook> book, std::string market_ticker, bool print_updates){
+void run_kalshi_feed(std::shared_ptr<SharedOrderBook> book, std::string market_ticker, bool print_updates){
     try{
         // as per the Kalshi API Docs
         KalshiSigner signer(config::private_key_path());
