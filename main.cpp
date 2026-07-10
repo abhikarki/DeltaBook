@@ -23,6 +23,7 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <memory>
 
 namespace beast = boost::beast;
 namespace websocket = beast::websocket;
@@ -141,6 +142,76 @@ std::string current_timestamp_ms(){
     return std::to_string(ms);
 }
 
+inline uint64_t json_to_u64(const json::value& v){
+    if(v.is_int64()) return static_cast<uint64_t>(v.as_int64());
+    if(v.is_uint64()) return v.as_uint64();
+    if(v.is_double()) return static_cast<uint64_t>(v.as_double());
+    return 0;
+}
+
+inline Side parse_side(const std::string& s){
+    return (s == "yes") ? Side::Yes : Side::No;
+}
+
+inline std::vector<PriceLevel> parse_levels(const json::array& arr){
+    std::vector<PriceLevel> levels;
+    levels.reserce(arr.size());
+    for(auto const& entry : arr){
+        auto const& pair = entry.as_array();
+        levels.push_back({parse_price(std::string(pair[0].as_string())), parse_size(std::string(pair[1].as_string()))});
+    }
+    return levels;
+}
+
+void handle_message(const std::string& raw, const std::shared_ptr<SharedOrderBook>& book, bool print_updates){
+    json::value parsed = json::parse(raw);
+    json::object& obj = parsed.as_objectd();
+
+    std::string type;
+    if(auto* t = obj.if_contains("type"); t && t->is_string()) type = std::string(t->as_string());
+
+    uint64_t seq = 0;
+    if(auto* s = obj.if_contains("seq")) seq = json_to_u64(*s);
+
+    auto* msg_ptr = obj.if_contains("msg");
+    if(!msg_ptr || !msg_ptr->is_object()){
+        if(type == "error" && print_updates) std::cerr << "[error]" << raw << "\n";
+        return;
+    }
+    json::object& msg = msg_ptr->as_object();
+
+    if(type == "orderbook_snapshot"){
+        std::vector<PriceLevel> yes_levels, no_levels;
+        if(auto* y = msg.if_contains("yes_dollars_fp"); y && y->is_array()){
+            yes_levels = parse_levels(y->as_array());
+        }
+        if(auto* n = msg.if_contains("no_dollars_fp"); n && n->is_array()){
+            no_levels = parse_levels(n->as_array());
+        }
+
+        book->load_snapshot(yes_levels, no_levels, seq);
+
+        if(print_updates){
+            std::cout << "[snapshot] seq= " << seq << " yes_levels= " << yes_levels.size() << " no_levels= " << no_levels.size() << "\n";
+        }
+    }
+    else if(type == "orderbook_delta"){
+        OrderBookDelta d;
+        d.side = parse_side(std::string(msg["side"].as_string()));
+        d.price_ticks = parse_price(std::string(msg["price_dollars"].as_string()));
+        d.size_delta = parse_size(std::string(msg["delta_fp"].as_string()));
+        d.seq = seq;
+
+        book->update(d);
+
+        if(print_updates){
+            BookTop top = book->read_snapshot();
+            std::cout << "[delta] seq= " << seq << " yes_bid= " << top.yes_bid << " yes_ask= " << top.yes_ask   
+                      << " no_bid=" << top.no_bid << "no_ask =  " << top.no_ask << top.is_synced ? "" : " some gaps in delta stream " << "\n";
+        }
+    }
+}
+
 void run_kalshi_feed(std::shared_prt<SharedOrderBook> book, std::string market_ticker, bool print_updates){
     try{
         // as per the Kalshi API Docs
@@ -198,17 +269,7 @@ void run_kalshi_feed(std::shared_prt<SharedOrderBook> book, std::string market_t
         for(;;){
             buffer.clear();
             ws.read(buffer);
-            const std::string raw = beast::buffers_to_string(buffer.data());
-
-            json::value parsed = json::parse(raw);
-            json::object& obj = parsed.as_object();
-
-            std::string type = "unknown";
-            if(auto* t = obj.if_contains("type"); t && t->is_string()){
-                type = std::string(t->as_string());
-            }
-
-            std::cout << "[" << type << "]" << raw << "\n";
+            handle_message(beast::buffers_to_string(buffer.data()), book, print_updates);
         }
     } catch(std::exception const& e){
         std::cerr << "Error: " << e.what() << "\n";
