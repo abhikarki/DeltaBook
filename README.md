@@ -4,6 +4,9 @@
 ```bash
 export KALSHI_API_KEY_ID="YOUR_API_KEY_ID"
 export KALSHI_PRIVATE_KEY_PATH="YOUR_PRIVATE_KEY_FILE_PATH"
+```
+
+```bash
 make clean
 make main_client
 ```
