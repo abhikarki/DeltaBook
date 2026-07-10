@@ -19,9 +19,8 @@ class PyKalshiBook{
             std::thread(run_kalshi_feed, book_, std::move(market_ticker), false);
         }
 
-        std::pair<int64_t, int64_t> get_best_bid_ask() const {
-            BookTop top = book_ -> read_snapshot();
-            return {top.yes_bid, top.yes_ask};
+        BookTop get_best_bid_ask() const {
+            return book_->read_snapshot();
         }
     private:
         std::shared_ptr<SharedOrderBook> book_;
@@ -30,6 +29,15 @@ class PyKalshiBook{
 PYBIND11_MODULE(kalshi_orderbook, m){
     m.doc() = "Live kalshi order book, updated on a background C++ thread";
 
+    // register the BookTop struct so Python can understand it
+    py::class_<BookTop>(m, "BookTop")
+        .def_readonly("yes_bid", &BookTop::yes_bid)
+        .def_readonly("yes_ask", &BookTop::yes_ask)
+        .def_readonly("no_bid", &BookTop::no_bid)
+        .def_readonly("no_ask", &BookTop::no_ask)
+        .def_readonly("is_synced", &BookTop::is_synced);
+    
+    //register OrderBook Class
     py::class_<PyKalshiBook>(m, "OrderBook")    
         .def(py::init<std::string>(), py::arg("market_ticker"))
         .def("get_best_bid_ask", &PyKalshiBook::get_best_bid_ask,
