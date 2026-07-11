@@ -1,7 +1,8 @@
 ## DeltaBook
 
 ## Telemetry
-<img width="1207" height="730" alt="DeltaBook_Telemetry_v1" src="https://github.com/user-attachments/assets/393aa2cc-4cd6-428f-87eb-d904c2692959" />
+<img width="650" height="400" alt="DeltaBook_Telemetry_v2" src="https://github.com/user-attachments/assets/f2f81f84-f03d-48fb-a7f7-38d01242c6a8" />
+
 
 
 ## setup and compile
