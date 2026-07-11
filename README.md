@@ -23,12 +23,5 @@ bulld test runner using doctest and run tests:
 make run_tests
 ./run_tests
 ```
-
-## python extension module
-```bash
-make kalshi_orderbook.so
-```
-verify:
-```bash
-python3 -c "import kalshi_orderbook; print(dir(kalshi_orderbook))"
-```
+## Python use case
+Look at sample_kalshi_use.py
