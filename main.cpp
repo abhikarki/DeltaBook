@@ -97,16 +97,16 @@ namespace telemetry{
 
     inline const char* event_name(EventId e){
         switch(e){
-            case EventId::JsonParse: return "json_parse";
-            case EventId::ParseSnapshotYesLevels: return "parse_snapshot_yes_levels";
-            case EventId::ParseSnapshotNoLevels: return "parse_snapshot_no_levels";
-            case EventId::ApplySnapshot:return "apply_snapshot";
-            case EventId::DecodeDelta: return "decode_delta";
-            case EventId::ApplyDelta: return "apply_delta";
-            case EventId::HandleMessageTotal: return "handle_message_total";
-            case EventId::WsRead: return "ws_read";
-            case EventId::MessageDispatch:  return "message_dispatch";
-            case EventId::NetworkLatency: return "network_latency";
+            case EventId::NetworkLatency: return "Network Latency (Wire-to-App)";
+            case EventId::WsRead: return "WebSocket Socket Read";
+            case EventId::HandleMessageTotal: return "Total Message Handling Lifecycle";
+            case EventId::JsonParse: return "JSON Structural Parsing";
+            case EventId::MessageDispatch: return "Message Type Dispatching Routing";
+            case EventId::ParseSnapshotYesLevels: return "Snapshot Parse: YES Outcomes";
+            case EventId::ParseSnapshotNoLevels: return "Snapshot Parse: NO Outcomes";
+            case EventId::ApplySnapshot: return "Apply Baseline Snapshot to Book";
+            case EventId::DecodeDelta: return "Decode Incoming Book Delta";
+            case EventId::ApplyDelta: return "Apply Incremental Delta to Book";
             default: return "unknown";
         }
     }
