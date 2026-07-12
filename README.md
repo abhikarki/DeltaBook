@@ -1,5 +1,11 @@
 ## DeltaBook
 
+## Low-Overhead Telemetry
+<img width="650" height="400" alt="DeltaBook_Telemetry_v2" src="https://github.com/user-attachments/assets/f2f81f84-f03d-48fb-a7f7-38d01242c6a8" /> <br>
+Adding benchmarking logic and timestamps directly inside business logic (for example, modifying the orderbook delta structures to also carry timestamps and labels to see timing at different points) can bloat their size and pollute CPU core's L1 cache which slows down the memory writes on the hot path. To eliminate this overhead, we decouple exectuion from monitoring. Core 1 and Core 2 (isolated cores for running the main orderbook logic) capture raw time measurements instantly using the hardware CPU cycle counter (__rdtsc()) in just a few nanoseconds, then immediately offload the data into pre allocated SPSC telemetry queues. For the queues, we use local integer copy (cached_read_index) for checking boundaries instead of querying other cores repeatedly. Thread running on Core 3 is responsible for polling the telemetry queues in the background, so our core orderbook logic and data path is not affected by logic for capturing metrics.
+
+
+
 ## setup and compile
 ```bash
 export KALSHI_API_KEY_ID="YOUR_API_KEY_ID"
