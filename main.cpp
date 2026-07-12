@@ -384,8 +384,15 @@ void run_kalshi_feed(std::shared_ptr<SharedOrderBook> book, std::string market_t
         beast::flat_buffer buffer;
         for(;;){
             buffer.clear();
-            ws.read(buffer);
+
+            {
+                // time we wait for socket
+                telemetry::ScopedTimer ws_timer(telemetry::EventId::WsRead);
+                ws.read(buffer);
+            }
+                
             handle_message(beast::buffers_to_string(buffer.data()), book, print_updates);
+            
         }
     } catch(std::exception const& e){
         std::cerr << "Error: " << e.what() << "\n";
@@ -398,6 +405,9 @@ int main(int argc, char** argv){
         std::cerr << "missing command line arguments" << std::endl;
         return 1;
     }
+
+    // to print the summary at exit
+    telemetry::install_summary_atexit();
 
     std::string market_ticker = argv[1];
 
