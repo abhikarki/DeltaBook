@@ -27,6 +27,15 @@
 #include <iomanip>
 #include <array>
 #include <limits>
+#include <csignal>
+#include <atomic>
+
+// global boolean to stop the infinite loop reading data
+std::atomic<bool> g_running{true};
+
+void signal_handler(int signal){
+    if(signal == SIGINT) g_running = false;
+}
 
 namespace beast = boost::beast;
 namespace websocket = beast::websocket;
@@ -384,7 +393,7 @@ void run_kalshi_feed(std::shared_ptr<SharedOrderBook> book, std::string market_t
         ws.write(net::buffer(json::serialize(sub)));
 
         beast::flat_buffer buffer;
-        for(;;){
+        while(g_running){
             buffer.clear();
 
             {
@@ -410,6 +419,9 @@ int main(int argc, char** argv){
 
     // to print the summary at exit
     telemetry::install_summary_atexit();
+
+    // to catch Ctrl+C when stopping
+    std::signal(SIGINT, signal_handler);
 
     std::string market_ticker = argv[1];
 
