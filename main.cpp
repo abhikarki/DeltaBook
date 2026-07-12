@@ -42,6 +42,7 @@ namespace telemetry{
         ParseSnapshotNoLevels,
         ApplySnapshot,
         DecodeDelta,
+        ApplyDelta,
         HandleMessageTotal,
         WsRead,
         MessageDispatch,
@@ -86,7 +87,7 @@ namespace telemetry{
 
     inline const char* event_name(EventId e){
         switch(e){
-            caseEventId::JsonParse: return "json_parse";
+            case EventId::JsonParse: return "json_parse";
             case EventId::ParseSnapshotYesLevels: return "parse_snapshot_yes_levels";
             case EventId::ParseSnapshotNoLevels: return "parse_snapshot_no_levels";
             case EventId::ApplySnapshot:return "apply_snapshot";
@@ -95,14 +96,14 @@ namespace telemetry{
             case EventId::HandleMessageTotal: return "handle_message_total";
             case EventId::WsRead: return "ws_read";
             case EventId::MessageDispatch:  return "message_dispatch";
-            default:
+            default: return "unknown";
         }
     }
 
     inline void print_summary(){
         std::cout << std::left << std::setw(30) << "event" << std::right << std::setw(12) << "count" << std::setw(16) << "avg(us)" << std::setw(16) << "min(us)" << std::setw(16) << "max (us)" << "\n";
 
-        for(size_t = 0; i < static<size_t>(EventId::Count); i++){
+        for(size_t i = 0; i < static_cast<size_t>(EventId::Count); i++){
             const auto& stats = g_stats[i];
             if(stats.count == 0) continue;
 
@@ -110,7 +111,7 @@ namespace telemetry{
             double avg = (static_cast<double>(stats.total_ns) / stats.count) / 1000.0;
             double min_us = static_cast<double>(stats.min_ns) / 1000.0;
             double max_us = static_cast<double>(stats.max_ns) / 1000.0;
-            std::cout << std::left << std::setw(30) << event_name(static_cast<EventId>(i)) << std::right << std::setw(12) << stats.Count << std::setw(16) << std::setprecision(3) << avg << std::setw(16) << min_us << std::setw(16) << max_us << "\n";
+            std::cout << std::left << std::setw(30) << event_name(static_cast<EventId>(i)) << std::right << std::setw(12) << stats.count << std::setw(16) << std::setprecision(3) << avg << std::setw(16) << min_us << std::setw(16) << max_us << "\n";
         }
     }
 
@@ -256,6 +257,7 @@ inline std::vector<PriceLevel> parse_levels(const json::array& arr){
 }
 
 void handle_message(const std::string& raw, const std::shared_ptr<SharedOrderBook>& book, bool print_updates){
+    std::cout << raw << std::endl;
     // to measure the total duration for handle_message
     telemetry::ScopedTimer total_timer(telemetry::EventId::HandleMessageTotal);
     
