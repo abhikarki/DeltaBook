@@ -24,6 +24,9 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <iomanip>
+#include <array>
+#include <limits>
 
 namespace beast = boost::beast;
 namespace websocket = beast::websocket;
@@ -253,7 +256,14 @@ inline std::vector<PriceLevel> parse_levels(const json::array& arr){
 }
 
 void handle_message(const std::string& raw, const std::shared_ptr<SharedOrderBook>& book, bool print_updates){
-    json::value parsed = json::parse(raw);
+    // to measure the total duration for handle_message
+    telemetry::ScopedTimer total_timer(telemetry::EventId::HandleMessageTotal);
+    
+    json::value parsed;
+    {
+        telemetry::ScopedTimer json_timer(telemetry::EventId::JsonParse);
+        parsed = json::parse(raw);
+    } 
     json::object& obj = parsed.as_object();
 
     std::string type;
@@ -269,16 +279,25 @@ void handle_message(const std::string& raw, const std::shared_ptr<SharedOrderBoo
     }
     json::object& msg = msg_ptr->as_object();
 
+    telemetry::ScopedTimer dispatch_timer(telemetry::EventId::MessageDispatch);
+
     if(type == "orderbook_snapshot"){
         std::vector<PriceLevel> yes_levels, no_levels;
+
         if(auto* y = msg.if_contains("yes_dollars_fp"); y && y->is_array()){
+            telemetry::ScopedTimer snap_yes_timer(telemetry::EventId::ParseSnapshotYesLevels);
             yes_levels = parse_levels(y->as_array());
         }
         if(auto* n = msg.if_contains("no_dollars_fp"); n && n->is_array()){
+            telemetry::ScopedTimer snap_no_timer(telemetry::EventId::ParseSnapshotNoLevels);
             no_levels = parse_levels(n->as_array());
         }
 
-        book->load_snapshot(yes_levels, no_levels, seq);
+        {
+            telemetry::ScopedTimer apply_snap_timer(telemetry::EventId::ApplySnapshot);
+            book->load_snapshot(yes_levels, no_levels, seq);
+        }
+       
 
         if(print_updates){
             std::cout << "[snapshot] seq= " << seq << " yes_levels= " << yes_levels.size() << " no_levels= " << no_levels.size() << "\n";
@@ -286,12 +305,20 @@ void handle_message(const std::string& raw, const std::shared_ptr<SharedOrderBoo
     }
     else if(type == "orderbook_delta"){
         OrderBookDelta d;
-        d.side = parse_side(std::string(msg["side"].as_string()));
-        d.price_ticks = parse_price(std::string(msg["price_dollars"].as_string()));
-        d.size_delta = parse_size(std::string(msg["delta_fp"].as_string()));
-        d.seq = seq;
 
-        book->update(d);
+        {
+            telemetry::ScopedTimer decode_delta_timer(telemetry::EventId::DecodeDelta);
+            d.side = parse_side(std::string(msg["side"].as_string()));
+            d.price_ticks = parse_price(std::string(msg["price_dollars"].as_string()));
+            d.size_delta = parse_size(std::string(msg["delta_fp"].as_string()));
+            d.seq = seq;
+        }
+
+        {
+            telemetry::ScopedTimer apply_delta_timer(telemetry::EventId::ApplyDelta);
+            book->update(d);
+        }
+        
 
         if(print_updates){
             BookTop top = book->read_snapshot();
