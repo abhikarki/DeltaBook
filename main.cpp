@@ -55,6 +55,7 @@ namespace telemetry{
         HandleMessageTotal,
         WsRead,
         MessageDispatch,
+        NetworkLatency,
         Count
     };
 
@@ -105,6 +106,7 @@ namespace telemetry{
             case EventId::HandleMessageTotal: return "handle_message_total";
             case EventId::WsRead: return "ws_read";
             case EventId::MessageDispatch:  return "message_dispatch";
+            case EventId::NetworkLatency: return "network_latency";
             default: return "unknown";
         }
     }
@@ -265,8 +267,7 @@ inline std::vector<PriceLevel> parse_levels(const json::array& arr){
     return levels;
 }
 
-void handle_message(const std::string& raw, const std::shared_ptr<SharedOrderBook>& book, bool print_updates){
-    std::cout << raw << std::endl;
+void handle_message(const std::string& raw, const std::shared_ptr<SharedOrderBook>& book, bool print_updates, uint64_t local_time_ms){
     // to measure the total duration for handle_message
     telemetry::ScopedTimer total_timer(telemetry::EventId::HandleMessageTotal);
     
@@ -276,6 +277,17 @@ void handle_message(const std::string& raw, const std::shared_ptr<SharedOrderBoo
         parsed = json::parse(raw);
     } 
     json::object& obj = parsed.as_object();
+
+    // network latency
+    if(auto* msg_ptr = obj.if_contains("msg"); msg_ptr && msg_ptr->is_object()){
+        if(auto* ts_ptr = msg_ptr->as_object().if_contains("ts_ms")){
+            uint64_t server_time_ms = json_to_u64(*ts_ptr);
+            if(server_time_ms > 0 && local_time_ms >= server_time_ms){
+                uint64_t latency_ms = local_time_ms - server_time_ms;
+                telemetry::record(telemetry::EventId::NetworkLatency, std::chrono::milliseconds(latency_ms));
+            }
+        }
+    }
 
     std::string type;
     if(auto* t = obj.if_contains("type"); t && t->is_string()) type = std::string(t->as_string());
@@ -401,8 +413,12 @@ void run_kalshi_feed(std::shared_ptr<SharedOrderBook> book, std::string market_t
                 telemetry::ScopedTimer ws_timer(telemetry::EventId::WsRead);
                 ws.read(buffer);
             }
+
+            // record the time so we can calculate network latency
+            auto arrival_time = std::chrono::system_clock::now().time_since_epoch();
+            uint64_t local_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(arrival_time).count();
                 
-            handle_message(beast::buffers_to_string(buffer.data()), book, print_updates);
+            handle_message(beast::buffers_to_string(buffer.data()), book, print_updates, local_time_ms);
             
         }
     } catch(std::exception const& e){
