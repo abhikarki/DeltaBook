@@ -378,7 +378,13 @@ struct FeedConfig{
     bool print_updates = false;
 };
 
-void run_kalshi_feed(std::shared_ptr<SharedOrderBook> book, std::string market_ticker, bool print_updates){
+
+void run_kalshi_feed(std::shared_ptr<MultiOrderBook> books, FeedConfig feed_config){
+    if(feed_config.market_tickers.empty()){
+        std::cerr << "Error: run_kalshi_feed called with no market_tickers" << std::endl;
+        return ;
+    }
+
     try{
         // as per the Kalshi API Docs
         KalshiSigner signer(config::private_key_path());
@@ -421,12 +427,18 @@ void run_kalshi_feed(std::shared_ptr<SharedOrderBook> book, std::string market_t
 
         std::cout << "connected to " << config::host << "\n";
 
+        json::array ticker_array;
+        for(auto const& ticker : feed_config.market_tickers){
+            books->get_or_create(ticker);
+            ticker_array.push_back(json::value(ticker));
+        }
+
         json::object sub;
         sub["id"] = 1;
         sub["cmd"] = "subscribe";
         json::object params;
         params["channels"] = json::array{"orderbook_delta"};
-        params["market_tickers"] = json::array{market_ticker};
+        params["market_tickers"] = ticker_array;
         sub["params"] = params;
 
         ws.write(net::buffer(json::serialize(sub)));
@@ -445,7 +457,7 @@ void run_kalshi_feed(std::shared_ptr<SharedOrderBook> book, std::string market_t
             auto arrival_time = std::chrono::system_clock::now().time_since_epoch();
             uint64_t local_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(arrival_time).count();
                 
-            handle_message(beast::buffers_to_string(buffer.data()), book, print_updates, local_time_ms);
+            handle_message(beast::buffers_to_string(buffer.data()), books, feed_config.print_updates, local_time_ms);
             
         }
     } catch(std::exception const& e){
