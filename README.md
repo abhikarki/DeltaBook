@@ -3,8 +3,7 @@
 ## Performance Benchmarks
 | Event Metric | Avg(μs) | Minimum(μs) | Maximum(μs) |
 |------------|----------|----------|----------|
-| **Network Latency (Wire-to-App)** | 40,600 | 32,000 | 89,000 | 
-| **WebSocket Socket Read** |  292,000 | 0.146 | 7,470,000 | 
+| **Network Latency (Kalshi-to-App)** | 40,600 | 32,000 | 89,000 | 
 | **Total Message Handling** | 18.6 | 2.57 | 69.2 | 
 | **JSON Structural Parsing** | 5.32 | 0.7 | 34.8 | 
 | **Message Dispatch** | 11.6 | 0.648 | 53.7 | 
