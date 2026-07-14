@@ -370,6 +370,14 @@ void handle_message(const std::string& raw, const std::shared_ptr<MultiOrderBook
     }
 }
 
+
+// this is all the marker tickers that a connection handles
+// later we will add core id to make the connection get handle by specific cpu core
+struct FeedConfig{
+    std::vector<std::string> market_tickers;
+    bool print_updates = false;
+};
+
 void run_kalshi_feed(std::shared_ptr<SharedOrderBook> book, std::string market_ticker, bool print_updates){
     try{
         // as per the Kalshi API Docs
