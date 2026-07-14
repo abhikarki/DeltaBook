@@ -29,6 +29,7 @@
 #include <limits>
 #include <csignal>
 #include <atomic>
+#include <thread>
 
 // global boolean to stop the infinite loop reading data
 std::atomic<bool> g_running{true};
@@ -133,6 +134,14 @@ namespace telemetry{
             std::atexit(print_summary);
             installed = true;
         }
+    }
+}
+
+// to modify later for core isolation optimization
+namespace feed_topology{
+    inline unsigned int available_hardware_concurrency(){
+        unsigned int n = std::thread::hardware_concurrency;
+        return n == 0 ? 1 : n;
     }
 }
 
@@ -267,7 +276,7 @@ inline std::vector<PriceLevel> parse_levels(const json::array& arr){
     return levels;
 }
 
-void handle_message(const std::string& raw, const std::shared_ptr<SharedOrderBook>& book, bool print_updates, uint64_t local_time_ms){
+void handle_message(const std::string& raw, const std::shared_ptr<MultiOrderBook>& books, bool print_updates, uint64_t local_time_ms){
     // to measure the total duration for handle_message
     telemetry::ScopedTimer total_timer(telemetry::EventId::HandleMessageTotal);
     
@@ -302,6 +311,16 @@ void handle_message(const std::string& raw, const std::shared_ptr<SharedOrderBoo
     }
     json::object& msg = msg_ptr->as_object();
 
+    std::string market_ticker;
+    if(auto* mt = msg.if_contains("marker_ticker"); mt && mt->is_string()){
+        market_ticker = std::string(mt->as_string());
+    }
+
+
+    if(market_ticker.empty()) return;
+
+    std::shared_ptr<SharedOrderBook> book = books->get_or_create(market_ticker);
+
     telemetry::ScopedTimer dispatch_timer(telemetry::EventId::MessageDispatch);
 
     if(type == "orderbook_snapshot"){
@@ -323,7 +342,7 @@ void handle_message(const std::string& raw, const std::shared_ptr<SharedOrderBoo
        
 
         if(print_updates){
-            std::cout << "[snapshot] seq= " << seq << " yes_levels= " << yes_levels.size() << " no_levels= " << no_levels.size() << "\n";
+            std::cout << "[snapshot] " << market_ticker << " seq= " << seq << " yes_levels= " << yes_levels.size() << " no_levels= " << no_levels.size() << "\n";
         }
     }
     else if(type == "orderbook_delta"){
@@ -345,7 +364,7 @@ void handle_message(const std::string& raw, const std::shared_ptr<SharedOrderBoo
 
         if(print_updates){
             BookTop top = book->read_snapshot();
-            std::cout << "[delta] seq= " << seq << " yes_bid= " << top.yes_bid << " yes_ask= " << top.yes_ask   
+            std::cout << "[delta] " << market_ticker << " seq= " << seq << " yes_bid= " << top.yes_bid << " yes_ask= " << top.yes_ask   
                       << " no_bid=" << top.no_bid << "no_ask =  " << top.no_ask << (top.is_synced ? "" : " some gaps in delta stream ") << "\n";
         }
     }
