@@ -1,30 +1,41 @@
 // cppimport
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <utility>
+#include <vector>
 
 #include "orderbook.hpp"
 #include "main.cpp"
 
 //defined in main.cpp
-void run_kalshi_feed(std::shared_ptr<SharedOrderBook> book, std::string market_ticker, bool print_updates);
+void run_kalshi_feed(std::shared_ptr<MultiOrderBook> books, FeedConfig feed_config);
 
 namespace py = pybind11;
 
 class PyKalshiBook{
     public:
-        explicit PyKalshiBook(std::string market_ticker) : book_(std::make_shared<SharedOrderBook>()){
-            std::thread(run_kalshi_feed, book_, std::move(market_ticker), false).detach();
+        explicit PyKalshiBook(std::vector<std::string> market_tickers) : books_(std::make_shared<MultiOrderBook>()){
+            if(market_tickers.empty()){
+                throw std::invalid_argument("OrderBook requires at least one market_ticker");
+            }
+            for(auto const& ticker : market_tickers) books_->get_or_create(ticker);
+            std::thread(run_kalshi_feed, books_, FeedConfig{std::move(market_tickers), false}).detach();
         }
 
-        BookTop get_best_bid_ask() const {
-            return book_->read_snapshot();
+        BookTop get_best_bid_ask(const std::string& market_ticker) const {
+            return book_-> get(market_ticker);
+            if(!book){
+                throw std::invalid_argument("market_ticker not tracked : " + market_ticker);
+                return book->read_snapshot();
+            }
         }
     private:
-        std::shared_ptr<SharedOrderBook> book_;
+        std::shared_ptr<MultiOrderBook> books_;
 };
 
 PYBIND11_MODULE(kalshi_orderbook, m){
@@ -40,7 +51,7 @@ PYBIND11_MODULE(kalshi_orderbook, m){
     
     //register OrderBook Class
     py::class_<PyKalshiBook>(m, "OrderBook")    
-        .def(py::init<std::string>(), py::arg("market_ticker"))
+        .def(py::init<std::vector<std::string>>(), py::arg("market_tickers"))
         .def("get_best_bid_ask", &PyKalshiBook::get_best_bid_ask,
             py::call_guard<py::gil_scoped_release>());
 }
