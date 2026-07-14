@@ -478,10 +478,10 @@ int main(int argc, char** argv){
     // to catch Ctrl+C when stopping
     std::signal(SIGINT, signal_handler);
 
-    std::string market_ticker = argv[1];
+    std::vector<std::string> market_tickers(argv + 1, argv + argc);
 
-    auto book = std::make_shared<SharedOrderBook>();
-    run_kalshi_feed(book, market_ticker, true);
+    auto books = std::make_shared<MultiOrderBook>();
+    run_kalshi_feed(book, FeedConfig{market_tickers, true});
 
     return 0;
 }
