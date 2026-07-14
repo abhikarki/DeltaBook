@@ -5,6 +5,8 @@
 #include <mutex>
 #include <string>
 #include <vector>
+#include <unordered_map>
+#include <memory?
 
 constexpr int64_t PRICE_TICKS_PER_DOLLAR = 10000;
 
@@ -147,4 +149,42 @@ class SharedOrderBook{
     private:
         mutable std::mutex mu_;
         OrderBook book_;
+};
+
+
+class MultiOrderBook{
+    public:
+        std::shared_ptr<SharedOrderBook> get_or_create(const std::string& market_ticker){
+            std::lock_guard<std::mutex> lock(mu_);
+            auto it = books_.find(market_ticker);
+            if(it != books_.end()) return it->second;
+
+            auto book = std::make_shared<SharedOrderBook>();
+            books_emplace_.emplace(market_ticker, book);
+            return book;
+        }
+
+        std::shared_ptr<SharedOrderBook> get(const std::string& market_ticker) const {
+            std::lock_guard<std::mutex> lock(mu_);
+            auto it = books_.find(market_ticker);
+            return (it == book_.end()) ? nullptr : it->second;
+        }
+
+
+        BookTop read_snapshot(const std::string& market_ticker) const {
+            auto book = get(market_ticker);
+            return book ? book->read_snapshot() : BookTop{};
+        }
+
+        std::vector<std::string> traced_tickers() const {
+            std::lock_guard<std::mutex> lock(mu_);
+            std::vector<std::string> out;
+            out.reserve(books_.size());
+            for(auto const& [ticker, _] : books_) out.push_back(ticker);
+            return out;
+        }
+
+    private:
+        mutable std::mutex mu_;
+        std::unordered_map<std::string, std::shared_ptr<SharedOrderBook>> books_;
 };
