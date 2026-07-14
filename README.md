@@ -36,7 +36,7 @@ make main_client
 ## Run
 use the market ticker of your interest
 ```bash
-./main_client {market_ticker}
+./main_client {market_tickers_separated_by space}
 ```
 
 ## Test
