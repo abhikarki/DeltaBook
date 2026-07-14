@@ -312,7 +312,7 @@ void handle_message(const std::string& raw, const std::shared_ptr<MultiOrderBook
     json::object& msg = msg_ptr->as_object();
 
     std::string market_ticker;
-    if(auto* mt = msg.if_contains("marker_ticker"); mt && mt->is_string()){
+    if(auto* mt = msg.if_contains("market_ticker"); mt && mt->is_string()){
         market_ticker = std::string(mt->as_string());
     }
 
