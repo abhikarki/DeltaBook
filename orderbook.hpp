@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
-#include <memory?
+#include <memory>
 
 constexpr int64_t PRICE_TICKS_PER_DOLLAR = 10000;
 
@@ -160,14 +160,14 @@ class MultiOrderBook{
             if(it != books_.end()) return it->second;
 
             auto book = std::make_shared<SharedOrderBook>();
-            books_emplace_.emplace(market_ticker, book);
+            books_.emplace(market_ticker, book);
             return book;
         }
 
         std::shared_ptr<SharedOrderBook> get(const std::string& market_ticker) const {
             std::lock_guard<std::mutex> lock(mu_);
             auto it = books_.find(market_ticker);
-            return (it == book_.end()) ? nullptr : it->second;
+            return (it == books_.end()) ? nullptr : it->second;
         }
 
 

@@ -140,7 +140,7 @@ namespace telemetry{
 // to modify later for core isolation optimization
 namespace feed_topology{
     inline unsigned int available_hardware_concurrency(){
-        unsigned int n = std::thread::hardware_concurrency;
+        unsigned int n = std::thread::hardware_concurrency();
         return n == 0 ? 1 : n;
     }
 }
@@ -481,7 +481,7 @@ int main(int argc, char** argv){
     std::vector<std::string> market_tickers(argv + 1, argv + argc);
 
     auto books = std::make_shared<MultiOrderBook>();
-    run_kalshi_feed(book, FeedConfig{market_tickers, true});
+    run_kalshi_feed(books, FeedConfig{market_tickers, true});
 
     return 0;
 }
