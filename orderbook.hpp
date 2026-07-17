@@ -84,7 +84,7 @@ class OrderBook{
         }
 
         void apply_delta(const OrderBookDelta& d){
-            check_seq(d.seq);
+            last_seq_ = d.seq;
 
             auto& book = (d.side == Side::Yes) ? yes_ : no_;
             auto it = book.find(d.price_ticks);
@@ -97,6 +97,8 @@ class OrderBook{
                 book[d.price_ticks] = updated;
             }
         }
+
+        void mark_synced(bool synced) {synced_ = synced;}
 
         // create and return the implied level for the book top
         BookTop get_snapshot() const {
@@ -146,6 +148,11 @@ class SharedOrderBook{
             return book_.get_snapshot();
         }
 
+        void mark_synced(bool synced){
+            std::lock_guard<std::mutex> lock(mu_);
+            book_.mark_synced(synced);
+        }
+
     private:
         mutable std::mutex mu_;
         OrderBook book_;
@@ -170,6 +177,18 @@ class MultiOrderBook{
             return (it == books_.end()) ? nullptr : it->second;
         }
 
+        bool observe_seq(uint64_t seq){
+            std::lock_guard<std::mutex> seq_lock(seq_mu_);
+            bool in_sequence = (last_seq_ == 0) || (seq == last_seq_ + 1);
+            if(seq > last_seq_) last_seq_ = seq;
+            if(!in_sequence) gap_count_++;
+            return in_sequence;
+        }
+ 
+        uint64_t total_gap_count() const {
+            std::lock_guard<std::mutex> seq_lock(seq_mu_);
+            return gap_count_;
+        }
 
         BookTop read_snapshot(const std::string& market_ticker) const {
             auto book = get(market_ticker);
@@ -184,7 +203,16 @@ class MultiOrderBook{
             return out;
         }
 
+        void mark_all_synced(bool synced){
+            std::lock_guard<std::mutex> lock(mu_);
+            for(auto& [ticker, book] : books_) book->mark_synced(synced);
+        }
+
     private:
         mutable std::mutex mu_;
         std::unordered_map<std::string, std::shared_ptr<SharedOrderBook>> books_;
+
+        mutable std::mutex seq_mu_;
+        uint64_t last_seq_ = 0;
+        uint64_t gap_count_ = 0;
 };
