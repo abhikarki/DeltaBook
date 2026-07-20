@@ -183,6 +183,35 @@ class MultiOrderBook{
             return index;
         }
 
+        size_t index_for(const std::string& market_ticker) const {
+            auto it = ticker_to_index_.find(market_ticker);
+            return (it == ticker_to_index_.end()) ? kInvalidIndex : it->second;
+        }
+
+        size_t size() const {return books_.size();}
+
+        SharedOrderBook& at(size_t index) {
+            return *books_[index];
+        }
+
+        // for readers
+        const SharedOrderBook& at(size_t index) const {
+            return *books_[index];
+        }
+
+        BookTop read_snapshot(size_t index) const {
+            if(index >= book_.size()) return BookTop{};
+            return books_[index]->read_snapshot();
+        }
+
+        // overload read_snapshot for market_ticker string
+        BookTop read_snapshot(const std::string& market_ticker) const{
+            size_t index = index_for(market_ticker);
+            return (index == kInvalidIndex) ? BookTop{} : books_[index]->read_snapshot();
+        }
+
+        
+
     private:
         std::vector<std::unique_ptr<SharedOrderBook>> books_;
         std::unordered_map<std::string, size_t> ticker_to_index;
