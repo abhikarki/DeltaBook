@@ -25,6 +25,17 @@ class SPSCQueue{
             return true;
         }
 
+        bool try_pop(T& out){
+            const size_t tail = tail_.load(std::memory_order_relaxed);
+            if(tail == head_.load(std::memory_order_acquire)){
+                return false;
+            }
+
+            out = std::move(buffer_[tail]);
+            tail_.store(advance(tail), std::memory_order_release);
+            return true;
+        }
+
         SPSCQueue(const SPSCQueue&) = delete;
         SPSCQueue& operator=(const SPSCQueue&) = delete;
     
