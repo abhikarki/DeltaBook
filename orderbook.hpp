@@ -223,6 +223,12 @@ class MultiOrderBook{
             return gap_count_;
         }
 
+        std::vector<std::string> tracked_tickers() const{
+            std::vector<std::string> out(books_.size());
+            for(auto const& [ticker, index] : ticker_to_index_) out[index] = ticker;
+            return out;
+        }
+
         void mark_all_synced(bool synced){
             for(auto& book : books_) book->mark_synced(synced);
         }
