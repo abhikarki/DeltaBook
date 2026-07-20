@@ -160,59 +160,16 @@ class SharedOrderBook{
 
 
 class MultiOrderBook{
-    public:
-        std::shared_ptr<SharedOrderBook> get_or_create(const std::string& market_ticker){
-            std::lock_guard<std::mutex> lock(mu_);
-            auto it = books_.find(market_ticker);
-            if(it != books_.end()) return it->second;
+    public: 
+        static constexpr size_t kInvalidIndex = static_cast<size_t>(-1);
 
-            auto book = std::make_shared<SharedOrderBook>();
-            books_.emplace(market_ticker, book);
-            return book;
-        }
-
-        std::shared_ptr<SharedOrderBook> get(const std::string& market_ticker) const {
-            std::lock_guard<std::mutex> lock(mu_);
-            auto it = books_.find(market_ticker);
-            return (it == books_.end()) ? nullptr : it->second;
-        }
-
-        bool observe_seq(uint64_t seq){
-            std::lock_guard<std::mutex> seq_lock(seq_mu_);
-            bool in_sequence = (last_seq_ == 0) || (seq == last_seq_ + 1);
-            if(seq > last_seq_) last_seq_ = seq;
-            if(!in_sequence) gap_count_++;
-            return in_sequence;
-        }
- 
-        uint64_t total_gap_count() const {
-            std::lock_guard<std::mutex> seq_lock(seq_mu_);
-            return gap_count_;
-        }
-
-        BookTop read_snapshot(const std::string& market_ticker) const {
-            auto book = get(market_ticker);
-            return book ? book->read_snapshot() : BookTop{};
-        }
-
-        std::vector<std::string> traced_tickers() const {
-            std::lock_guard<std::mutex> lock(mu_);
-            std::vector<std::string> out;
-            out.reserve(books_.size());
-            for(auto const& [ticker, _] : books_) out.push_back(ticker);
-            return out;
-        }
-
-        void mark_all_synced(bool synced){
-            std::lock_guard<std::mutex> lock(mu_);
-            for(auto& [ticker, book] : books_) book->mark_synced(synced);
-        }
+        MultiOrderBook() = default;
 
     private:
-        mutable std::mutex mu_;
-        std::unordered_map<std::string, std::shared_ptr<SharedOrderBook>> books_;
+        std::vector<std::unique_ptr<SharedOrderBook>> books_;
+        std::unordered_map<std::string, size_t> ticker_to_index;
 
-        mutable std::mutex seq_mu_;
+        mutable std::mutex seq_mu;
         uint64_t last_seq_ = 0;
-        uint64_t gap_count_ = 0;
+        uint64+t gap_count_ = 0;
 };
