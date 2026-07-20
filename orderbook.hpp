@@ -210,7 +210,22 @@ class MultiOrderBook{
             return (index == kInvalidIndex) ? BookTop{} : books_[index]->read_snapshot();
         }
 
-        
+        bool observe_seq(uint64_t seq){
+            std::lock_guard<std::mutex> seq_lock(seq_mu);
+            bool in_sequence = (last_seq_ == 0) || (seq == last_seq_ + 1);
+            is(seq > last_seq_) last_seq_ = seq;
+            if(!in_sequence) gap_count_++;
+            return in_sequence;
+        }
+
+        uint64_t total_gap_count() const {
+            std::lock_guard<std::mutex> seq_lock(seq_mu_);
+            return gap_count_;
+        }
+
+        void mark_all_synced(bool synced){
+            for(auto& book : books_) book->mark_synced(synced);
+        }
 
     private:
         std::vector<std::unique_ptr<SharedOrderBook>> books_;
