@@ -165,11 +165,29 @@ class MultiOrderBook{
 
         MultiOrderBook() = default;
 
+        explicit MultiOrderBook(const std::vector<std::string>& market_tickers){
+            books_.reserve(market_tickers.size());
+            ticker_to_index_.reserve(market_tickers.size());
+            for(auto const& ticker : market_tickers) add_ticker(ticker);
+        }
+
+        // no lock for now since it is not part of the hot path
+        // later this will be used when user wants to initialize the market_tickers at beginning at once
+        size_t add_ticker(const std::string& market_ticker){
+            auto it = ticker_to_index_.find(market_ticker);
+            if(it != tikcer_to_index_.end()) return it->second;
+
+            size_t index = books_.size();
+            books_.push_back(std::make_unique<SharedOrderBook>());
+            ticker_to_index_.emplace(market_ticker, index);
+            return index;
+        }
+
     private:
         std::vector<std::unique_ptr<SharedOrderBook>> books_;
         std::unordered_map<std::string, size_t> ticker_to_index;
 
         mutable std::mutex seq_mu;
         uint64_t last_seq_ = 0;
-        uint64+t gap_count_ = 0;
+        uint64_t gap_count_ = 0;
 };
