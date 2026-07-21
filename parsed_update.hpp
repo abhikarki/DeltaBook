@@ -116,3 +116,16 @@ inline std::optional<ParsedUpdate> parse_message(const std::string& raw, const M
     }
     return update;
 }
+
+inline void apply_update(MultiOrderBook& books, const ParsedUpdate& u){
+    if(u.type == ParsedUpdate::Type::Unknown || u.book_index == MultiOrderBook::kInvalidIndex) return;
+
+    ShardOrderBook& book = books.at(u.book_index);
+    if(u.type == ParsedUpdate::Type::Snapshot){
+        book.load_snapshot(u.yes_levels, u.no_levels, u.seq);
+    }
+    else{
+        OrderBookDelta d {u.side, u.price_ticks, u.size_delta, u.seq};
+        book.update(d);
+    }
+}
