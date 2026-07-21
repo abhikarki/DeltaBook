@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <vector>
 #include <utility>
+#include <chrono>
 
 template <typename T>
 class SPSCQueue{
@@ -35,6 +36,14 @@ class SPSCQueue{
             tail_.store(advance(tail), std::memory_order_release);
             return true;
         }
+
+        size_t size_approx() const {
+            size_t head = head_.load(std::memory_order_acquire);
+            size_t tail = tail_.load(std::memory_order_acquire);
+            return (head + capacity - tail) % capacity;
+        }
+
+        size_t capacity() const {return capacit_ - 1;}
 
         SPSCQueue(const SPSCQueue&) = delete;
         SPSCQueue& operator=(const SPSCQueue&) = delete;
