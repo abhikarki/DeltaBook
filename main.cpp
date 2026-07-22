@@ -250,7 +250,47 @@ std::string current_timestamp_ms(){
 
 constexpr size_t kQueueCapacity = 4096;
 
+// read, parse the message and push the ParsedUpdate to SPSC queue
+void run_reader_thread(websocket::stream<beast::ssl_stream<beast::tcp_stream>>& ws, const std::shared_ptr<MultiOrderBook& books, SPSCQueue<ParsedUpdate>& queue, bool print_updates){
+    simdjson::ondemand::parser parser;
+    beast::flat_buffer buffer;
+    
+    try{
+        while(g_running){
+            buffer.clear();
+            {
+                telemetry::ScopedTimer ws_timer(telemetry::EventId::WsRead);
+                ws.read(buffer);
+            }
+            
+            auto arrival_time = std::chrono::system_clock::now().time_since_epoch();
+            uint64_t local_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(arrival_time).count();
+            std::string raw = beast::buffers_to_string(buffer.data());
 
+            std::optional<ParsedUpdate> update;
+            {
+                telemetry::ScopedTimer parse_timer(telemetry::EventId::JsonParse);
+                update = parse_message(raw, *books, local_time_ms, parser);
+            }
+            if(!update){
+                if(print_updates && raw.find("\"type\":\"error\"") != std::string::npos){
+                    std::cerr << "[error]  " << raw << "\n";
+                }
+                continue;
+            }
+            if(update->server_time_ms > 0 && update->local_time_ms >= update->server_time_ms){
+                telemetry::record(telemetry::EventId::NetworkLatency, std::chrono::milliseconds(update->local_time_ms - update->server_time_ms));
+            }
+
+            queue.try_push(std::move(*update));  // need error handling
+        }
+    }
+    catch{
+        std::cerr << "Error in reader thread - " << e.what() << std::endl;
+    }
+
+    g_running = false;
+}
 
 // this is all the marker tickers that a connection handles
 // later we will add core id to make the connection get handle by specific cpu core
