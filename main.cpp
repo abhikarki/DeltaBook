@@ -401,23 +401,12 @@ void run_kalshi_feed(std::shared_ptr<MultiOrderBook> books, FeedConfig feed_conf
 
         ws.write(net::buffer(json::serialize(sub)));
 
-        beast::flat_buffer buffer;
-        while(g_running){
-            buffer.clear();
+        SPSCQueue<ParsedUpdate> queue(kQueueCapacity);
 
-            {
-                // time we wait for socket
-                telemetry::ScopedTimer ws_timer(telemetry::EventId::WsRead);
-                ws.read(buffer);
-            }
+        std::thread applier(run_applier_thread, books, std::ref(queue), feed_config.print_updates);
+        run_reader_thread(ws, books, queue, feed_config.print_updates)
+        applier.join();
 
-            // record the time so we can calculate network latency
-            auto arrival_time = std::chrono::system_clock::now().time_since_epoch();
-            uint64_t local_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(arrival_time).count();
-                
-            handle_message(beast::buffers_to_string(buffer.data()), books, feed_config.print_updates, local_time_ms);
-            
-        }
     } catch(std::exception const& e){
         std::cerr << "Error: " << e.what() << "\n";
     }
