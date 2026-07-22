@@ -292,6 +292,40 @@ void run_reader_thread(websocket::stream<beast::ssl_stream<beast::tcp_stream>>& 
     g_running = false;
 }
 
+// pop ParsedUpdate from SPSC queue and apply to SharedOrderBook.
+void run_applier_thread(const std::shared_ptr<MultiOrderBook>& books, SPSCQueue<ParsedUpdate>& queue, bool print_updates){
+    std::vector<std::string> ticker_names = print_updates ? books->tracked_tickers() : std::vector<std::string>{};
+    ParsedUpdate update;
+
+    while(g_running || queue.size_approx() > 0){
+        if(!queue.try_pop(update)){
+            continue;
+        }
+
+        if(update.type == ParsedUpdate::Type::Snapshot){
+            telemetry::ScopedTimer apply_timer(telemetry::EventId::ApplySnapshot);
+            apply_update(*books, update);
+        }
+        else if(update.type == ParsedUpdate::Type::Delta){
+            telemetry::ScopedTimer apply_timer(telemetry::EventId::ApplyDelta);
+            apply_update(*books, update);
+        }
+        else continue;
+
+        if(print_updates && update.book_index < ticker_names.size()){
+            const std::string& ticker = ticker_names[update.book_index];
+            if(update.type == ParsedUpdate::Type::Snapshot){
+                std::cout << "[snapshot] " << ticker << " seq = " << update.seq << " yes_levels= " << update.yes_levels.size() << "no _levels= " << update.no_levels.size() << "\n"; 
+            }
+            else{
+                BookTop top = books->read_snapshot(update.book_index);
+                std::cout << "[delta] " << ticker << "seq = " << update.seq << " yes_bid= " << top.yes_bid << "yes_ask=" << top.yes_ask << " no_bid = " << top.no_bid << " no_ask = " << top.no_ask << (top.is_synced ? "" : "some gaps in stream") << "\n";
+            }
+        }
+
+    }
+}
+
 // this is all the marker tickers that a connection handles
 // later we will add core id to make the connection get handle by specific cpu core
 struct FeedConfig{
