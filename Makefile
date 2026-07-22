@@ -10,11 +10,16 @@ TEST_TARGET = run_tests
 
 # automatically find our tests
 TEST_SRCS = tests/test_main.cpp $(wildcard tests/*_tests.cpp)
+MAIN_DEPS = main.cpp orderbook.hpp parsed_update.hpp SPSC_queue.hpp
+PY_DEPS = kalshi_orderbook.cpp orderbook.hpp parsed_update.hpp SPSC_queue.hpp
 
 all: $(CPP_TARGET)
 
-$(CPP_TARGET) : main.cpp orderbook.hpp
+$(CPP_TARGET) : $(MAIN_DEPS)
 	$(CXX) $(CXXFLAGS) main.cpp -o $(CPP_TARGET) $(LIBS)
+
+$(PY_TARGET) : $(PY_DEPS)
+	$(CXX) $(CXXFLAGS) kalshi_orderbook.cpp -o $(PY_TARGET) $(LIBS)
 
 #Test Target
 $(TEST_TARGET) : $(TEST_SRCS)
