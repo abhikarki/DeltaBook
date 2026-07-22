@@ -282,7 +282,9 @@ void run_reader_thread(websocket::stream<beast::ssl_stream<beast::tcp_stream>>& 
                 telemetry::record(telemetry::EventId::NetworkLatency, std::chrono::milliseconds(update->local_time_ms - update->server_time_ms));
             }
 
-            queue.try_push(std::move(*update));  // need error handling
+            while(!queue.try_push(std::move(*update))){
+                std::this_thread::yield();
+            }  
         }
     }
     catch{
@@ -299,6 +301,7 @@ void run_applier_thread(const std::shared_ptr<MultiOrderBook>& books, SPSCQueue<
 
     while(g_running || queue.size_approx() > 0){
         if(!queue.try_pop(update)){
+            std::this_thread::yield();
             continue;
         }
 
