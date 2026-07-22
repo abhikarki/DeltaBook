@@ -1,4 +1,6 @@
 #include "orderbook.hpp"
+#include "spsc_queue.hpp"
+#include "parsed_update.hpp"
 
 #include <boost/asio/connect.hpp>
 #include <boost/asio/ip/tcp.hpp>
@@ -30,6 +32,7 @@
 #include <csignal>
 #include <atomic>
 #include <thread>
+#include <optional>
 
 // global boolean to stop the infinite loop reading data
 std::atomic<bool> g_running{true};
@@ -48,14 +51,9 @@ namespace json = boost::json;
 namespace telemetry{
     enum class EventId : size_t{
         JsonParse = 0,
-        ParseSnapshotYesLevels,
-        ParseSnapshotNoLevels,
         ApplySnapshot,
-        DecodeDelta,
         ApplyDelta,
-        HandleMessageTotal,
         WsRead,
-        MessageDispatch,
         NetworkLatency,
         Count
     };
@@ -98,17 +96,12 @@ namespace telemetry{
 
     inline const char* event_name(EventId e){
         switch(e){
-            case EventId::NetworkLatency: return "Network Latency (Wire-to-App)";
-            case EventId::WsRead: return "WebSocket Socket Read";
-            case EventId::HandleMessageTotal: return "Total Message Handling Lifecycle";
-            case EventId::JsonParse: return "JSON Structural Parsing";
-            case EventId::MessageDispatch: return "Message Type Dispatching Routing";
-            case EventId::ParseSnapshotYesLevels: return "Snapshot Parse: YES Outcomes";
-            case EventId::ParseSnapshotNoLevels: return "Snapshot Parse: NO Outcomes";
-            case EventId::ApplySnapshot: return "Apply Baseline Snapshot to Book";
-            case EventId::DecodeDelta: return "Decode Incoming Book Delta";
-            case EventId::ApplyDelta: return "Apply Incremental Delta to Book";
-            default: return "unknown";
+            case EventId::NetworkLatency: return "Network Latency";
+            case EventId::WsRead: return "Websocket Socket Read";
+            case EventId::JsonParse: return "simdjson parse + Index Resolve";
+            case EventId::ApplySnapshot: reutrn "Apply Baseline Sanpshot to Book";
+            case EventId::ApplyDelta: return "Apply Delta to Book";
+            default: return "Unknown";
         }
     }
 
