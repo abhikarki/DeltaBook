@@ -2,7 +2,7 @@ CXX = g++
 CXXFLAGS = -std=c++17 -O2 -march=native -Wall -Wextra
 
 # to link libraries for boost, OpenSSL and thread
-LIBS = -lboost_system -lboost_json -lssl -lcrypto -pthread
+LIBS = -lsimdjson -lboost_system -lboost_json -lssl -lcrypto -pthread
 
 CPP_TARGET = main_client
 PY_TARGET = kalshi_orderbook$(EXTENSION_SUFFIX)
