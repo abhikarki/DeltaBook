@@ -99,7 +99,7 @@ namespace telemetry{
             case EventId::NetworkLatency: return "Network Latency";
             case EventId::WsRead: return "Websocket Socket Read";
             case EventId::JsonParse: return "simdjson parse + Index Resolve";
-            case EventId::ApplySnapshot: reutrn "Apply Baseline Sanpshot to Book";
+            case EventId::ApplySnapshot: return "Apply Baseline Sanpshot to Book";
             case EventId::ApplyDelta: return "Apply Delta to Book";
             default: return "Unknown";
         }
@@ -251,7 +251,7 @@ std::string current_timestamp_ms(){
 constexpr size_t kQueueCapacity = 4096;
 
 // read, parse the message and push the ParsedUpdate to SPSC queue
-void run_reader_thread(websocket::stream<beast::ssl_stream<beast::tcp_stream>>& ws, const std::shared_ptr<MultiOrderBook& books, SPSCQueue<ParsedUpdate>& queue, bool print_updates){
+void run_reader_thread(websocket::stream<beast::ssl_stream<beast::tcp_stream>>& ws, const std::shared_ptr<MultiOrderBook>& books, SPSCQueue<ParsedUpdate>& queue, bool print_updates){
     simdjson::ondemand::parser parser;
     beast::flat_buffer buffer;
     
@@ -287,7 +287,7 @@ void run_reader_thread(websocket::stream<beast::ssl_stream<beast::tcp_stream>>& 
             }  
         }
     }
-    catch{
+    catch (std::exception const& e){
         std::cerr << "Error in reader thread - " << e.what() << std::endl;
     }
 
@@ -387,7 +387,6 @@ void run_kalshi_feed(std::shared_ptr<MultiOrderBook> books, FeedConfig feed_conf
 
         json::array ticker_array;
         for(auto const& ticker : feed_config.market_tickers){
-            books->get_or_create(ticker);
             ticker_array.push_back(json::value(ticker));
         }
 
@@ -404,7 +403,7 @@ void run_kalshi_feed(std::shared_ptr<MultiOrderBook> books, FeedConfig feed_conf
         SPSCQueue<ParsedUpdate> queue(kQueueCapacity);
 
         std::thread applier(run_applier_thread, books, std::ref(queue), feed_config.print_updates);
-        run_reader_thread(ws, books, queue, feed_config.print_updates)
+        run_reader_thread(ws, books, queue, feed_config.print_updates);
         applier.join();
 
     } catch(std::exception const& e){

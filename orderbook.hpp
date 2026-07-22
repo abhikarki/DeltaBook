@@ -175,7 +175,7 @@ class MultiOrderBook{
         // later this will be used when user wants to initialize the market_tickers at beginning at once
         size_t add_ticker(const std::string& market_ticker){
             auto it = ticker_to_index_.find(market_ticker);
-            if(it != tikcer_to_index_.end()) return it->second;
+            if(it != ticker_to_index_.end()) return it->second;
 
             size_t index = books_.size();
             books_.push_back(std::make_unique<SharedOrderBook>());
@@ -200,7 +200,7 @@ class MultiOrderBook{
         }
 
         BookTop read_snapshot(size_t index) const {
-            if(index >= book_.size()) return BookTop{};
+            if(index >= books_.size()) return BookTop{};
             return books_[index]->read_snapshot();
         }
 
@@ -211,9 +211,9 @@ class MultiOrderBook{
         }
 
         bool observe_seq(uint64_t seq){
-            std::lock_guard<std::mutex> seq_lock(seq_mu);
+            std::lock_guard<std::mutex> seq_lock(seq_mu_);
             bool in_sequence = (last_seq_ == 0) || (seq == last_seq_ + 1);
-            is(seq > last_seq_) last_seq_ = seq;
+            if(seq > last_seq_) last_seq_ = seq;
             if(!in_sequence) gap_count_++;
             return in_sequence;
         }
@@ -235,9 +235,9 @@ class MultiOrderBook{
 
     private:
         std::vector<std::unique_ptr<SharedOrderBook>> books_;
-        std::unordered_map<std::string, size_t> ticker_to_index;
+        std::unordered_map<std::string, size_t> ticker_to_index_;
 
-        mutable std::mutex seq_mu;
+        mutable std::mutex seq_mu_;
         uint64_t last_seq_ = 0;
         uint64_t gap_count_ = 0;
 };

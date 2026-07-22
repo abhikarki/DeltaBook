@@ -50,7 +50,7 @@ namespace detail{
             std::string_view size_sv;
             if((*it).get_string().get(size_sv) != simdjson::SUCCESS) continue;
 
-            out.push_back(PriceLvel{parse_price(std::string(price_sv)), parse_size(std::string(size_sv))});
+            out.push_back(PriceLevel{parse_price(std::string(price_sv)), parse_size(std::string(size_sv))});
         }
         return true;
     }
@@ -75,9 +75,9 @@ inline std::optional<ParsedUpdate> parse_message(const std::string& raw, const M
     if(msg_val.get_object().get(msg) != simdjson::SUCCESS) return std::nullopt;
 
     std::string_view ticker_sv;
-    if(msg["market_ticker"].get_string().get(ticker_sv) != simdjson::SUCCESS) return std:nullopt;
+    if(msg["market_ticker"].get_string().get(ticker_sv) != simdjson::SUCCESS) return std::nullopt;
 
-    size_t inde x= book.index_for(std::string(ticker_sv));
+    size_t index = books.index_for(std::string(ticker_sv));
     if(index == MultiOrderBook::kInvalidIndex) return std::nullopt;
 
     ParsedUpdate update;
@@ -120,7 +120,7 @@ inline std::optional<ParsedUpdate> parse_message(const std::string& raw, const M
 inline void apply_update(MultiOrderBook& books, const ParsedUpdate& u){
     if(u.type == ParsedUpdate::Type::Unknown || u.book_index == MultiOrderBook::kInvalidIndex) return;
 
-    ShardOrderBook& book = books.at(u.book_index);
+    SharedOrderBook& book = books.at(u.book_index);
     if(u.type == ParsedUpdate::Type::Snapshot){
         book.load_snapshot(u.yes_levels, u.no_levels, u.seq);
     }

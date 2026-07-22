@@ -40,17 +40,17 @@ class SPSCQueue{
         size_t size_approx() const {
             size_t head = head_.load(std::memory_order_acquire);
             size_t tail = tail_.load(std::memory_order_acquire);
-            return (head + capacity - tail) % capacity;
+            return (head + capacity_ - tail) % capacity_;
         }
 
-        size_t capacity() const {return capacit_ - 1;}
+        size_t capacity() const {return capacity_ - 1;}
 
         SPSCQueue(const SPSCQueue&) = delete;
         SPSCQueue& operator=(const SPSCQueue&) = delete;
     
     private:
         const size_t capacity_;
-        std::vector<T> buffer;
+        std::vector<T> buffer_;
         std::atomic<size_t> head_{0};
         std::atomic<size_t> tail_{0};
 
