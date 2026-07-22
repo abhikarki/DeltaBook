@@ -19,20 +19,19 @@ namespace py = pybind11;
 
 class PyKalshiBook{
     public:
-        explicit PyKalshiBook(std::vector<std::string> market_tickers) : books_(std::make_shared<MultiOrderBook>()){
+        explicit PyKalshiBook(std::vector<std::string> market_tickers) : books_(std::make_shared<MultiOrderBook>(market_tickers)){
             if(market_tickers.empty()){
                 throw std::invalid_argument("OrderBook requires at least one market_ticker");
             }
-            for(auto const& ticker : market_tickers) books_->get_or_create(ticker);
             std::thread(run_kalshi_feed, books_, FeedConfig{std::move(market_tickers), false}).detach();
         }
 
         BookTop get_best_bid_ask(const std::string& market_ticker) const {
-            return book_-> get(market_ticker);
-            if(!book){
+            size_t index = books_->index_for(market_ticker);
+            if(index == MultiOrderBook::kInvalidIndex){
                 throw std::invalid_argument("market_ticker not tracked : " + market_ticker);
-                return book->read_snapshot();
             }
+            return books_->read_snapshot(index);
         }
     private:
         std::shared_ptr<MultiOrderBook> books_;
@@ -60,6 +59,6 @@ PYBIND11_MODULE(kalshi_orderbook, m){
 <%
 setup_pybind11(cfg)
 cfg['compiler_args'] = ['-std=c++17', '-O2', '-march=native', '-Wall', '-Wextra', '-DKALSHI_PYBIND_BUILD']
-cfg['libraries'] = ['boost_system', 'boost_json', 'ssl', 'crypto']
+cfg['libraries'] = ['boost_system', 'boost_json', 'ssl', 'crypto', 'simdjson']
 %>
 */

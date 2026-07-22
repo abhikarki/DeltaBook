@@ -427,7 +427,7 @@ int main(int argc, char** argv){
 
     std::vector<std::string> market_tickers(argv + 1, argv + argc);
 
-    auto books = std::make_shared<MultiOrderBook>();
+    auto books = std::make_shared<MultiOrderBook>(market_tickers);
     run_kalshi_feed(books, FeedConfig{market_tickers, true});
 
     return 0;
