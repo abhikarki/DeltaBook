@@ -10,8 +10,8 @@ TEST_TARGET = run_tests
 
 # automatically find our tests
 TEST_SRCS = tests/test_main.cpp $(wildcard tests/*_tests.cpp)
-MAIN_DEPS = main.cpp orderbook.hpp parsed_update.hpp spsc_queue.hpp
-PY_DEPS = kalshi_orderbook.cpp orderbook.hpp parsed_update.hpp SPSC_queue.hpp
+MAIN_DEPS = main.cpp orderbook.hpp parsed_update.hpp spsc_queue.hpp telemetry.hpp
+PY_DEPS = kalshi_orderbook.cpp orderbook.hpp parsed_update.hpp spsc_queue.hpp telemetry.hpp
 
 all: $(CPP_TARGET)
 
