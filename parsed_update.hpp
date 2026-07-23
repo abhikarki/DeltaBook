@@ -9,6 +9,7 @@
 #include <simdjson.h>
 
 #include "orderbook.hpp"
+#include "telemetry.hpp"
 
 struct ParsedUpdate{
     enum class Type : uint8_t {Snapshot, Delta, Unknown};
@@ -77,7 +78,11 @@ inline std::optional<ParsedUpdate> parse_message(const std::string& raw, const M
     std::string_view ticker_sv;
     if(msg["market_ticker"].get_string().get(ticker_sv) != simdjson::SUCCESS) return std::nullopt;
 
-    size_t index = books.index_for(std::string(ticker_sv));
+    size_t index;
+    {
+        telemetry::ScopedTimer index_timer(telemetry::EventId::IndexResolve);
+        index = books.index_for(std::string(ticker_sv));
+    }
     if(index == MultiOrderBook::kInvalidIndex) return std::nullopt;
 
     ParsedUpdate update;
@@ -108,7 +113,8 @@ inline std::optional<ParsedUpdate> parse_message(const std::string& raw, const M
         std::string_view side_sv, price_sv, delta_sv;
         if(msg["side"].get_string().get(side_sv) != simdjson::SUCCESS) return std::nullopt;
         if(msg["price_dollars"].get_string().get(price_sv) != simdjson::SUCCESS) return std::nullopt;
-        if(msg["delts_fp"].get_string().get(delta_sv) != simdjson::SUCCESS) return std::nullopt;
+        if(msg["delta_fp"].get_string().get(delta_sv) != simdjson::SUCCESS) return std::nullopt;
+
 
         update.side = parse_side(side_sv);
         update.price_ticks = parse_price(std::string(price_sv));
