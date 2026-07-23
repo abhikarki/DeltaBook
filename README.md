@@ -3,15 +3,9 @@
 ## Performance Benchmarks
 | Event Metric | Avg(μs) | Minimum(μs) | Maximum(μs) |
 |------------|----------|----------|----------|
-| **Network Latency (Kalshi-to-App)** | 40,600 | 32,000 | 89,000 | 
-| **Total Message Handling** | 18.6 | 2.57 | 69.2 | 
-| **JSON Structural Parsing** | 5.32 | 0.7 | 34.8 | 
-| **Message Dispatch** | 11.6 | 0.648 | 53.7 | 
-| **Snapshot Parse: YES Outcomes** | 9.96 | 9.96 | 9.96 | 
-| **Snapshot Parse: NO Outcomes** | 0.863 | 0.863 | 0.863 |
-| **Apply Snapshot to Book** | 2.55 | 2.55 | 2.55 | 
-| **Decode Incoming Delta** | 1.5 | 0.222 | 9.19 |
-| **Apply Delta to Book** | 0.329 | 0.038 | 1.29 |
+| **JSON Parsing** | 2.81 | 0.475 | 35.1 | 
+| **Apply Parsed Baseline Snapshot to Book** | 3.43 | 0.418 | 6.43 | 
+| **Apply Parsed Delta to Book** | 0.307 | 0.048 | 3.72 |
 
 <br>
 The data processing for our program begins at the network layer with socket read, which blocks execution wile waiting for packets. After the socket unblocks, Network Latency is calculated by the absolute time difference between Kalshi's server timestamp and current time. This metric measures the elapsed time from the moment Kalshi publishes the message until it reaches our program (also including the time through our NIC, kernel, and OpenSSL decryption to user space.) <br>
