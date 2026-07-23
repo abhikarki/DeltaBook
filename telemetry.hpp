@@ -71,11 +71,20 @@ namespace telemetry{
     inline void print_summary(){
         std::cout << std::left << std::setw(30) << "event" << std::right << std::setw(12) << "count" << std::setw(16) << "avg(us)" << std::setw(16) << "min(us)" << std::setw(16) << "max (us)" << "\n";
 
+        const auto& parse_stats = g_stats[static_cast<size_t>(EventId::JsonParse)];
+        const auto& index_stats = g_stats[static_cast<size_t>(EventId::IndexResolve)];
+        int64_t adjusted_parse_total_ns = parse_stats.total_ns - index_stats.total_ns;
+        if(adjusted_parse_total_ns < 0) adjusted_parse_total_ns = 0;
+
         for(size_t i = 0; i < static_cast<size_t>(EventId::Count); i++){
             const auto& stats = g_stats[i];
             if(stats.count == 0) continue;
 
-            double avg = (static_cast<double>(stats.total_ns) / stats.count) / 1000.0;
+            double avg_ns = static_cast<double>(stats.total_ns);
+            if(i == static_cast<size_t>(EventId::JsonParse)){
+                avg_ns = static_cast<double>(adjusted_parse_total_ns);
+            }
+            double avg = (avg_ns / stats.count) / 1000.0;
             double min_us = static_cast<double>(stats.min_ns) / 1000.0;
             double max_us = static_cast<double>(stats.max_ns) / 1000.0;
             std::cout << std::left << std::setw(30) << event_name(static_cast<EventId>(i)) << std::right << std::setw(12) << stats.count << std::setw(16) << std::setprecision(3) << avg << std::setw(16) << min_us << std::setw(16) << max_us << "\n";
