@@ -1,6 +1,7 @@
 // cppimport
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include <pybind11/stl_bind.h>
 
 #include <memory>
 #include <stdexcept>
@@ -16,6 +17,9 @@
 void run_kalshi_feed(std::shared_ptr<MultiOrderBook> books, FeedConfig feed_config);
 
 namespace py = pybind11;
+
+// Opaque vector registration to prevent pybind11 from copying std::vector into a native Python list
+PYBIND11_MAKE_OPAQUE(std::vector<PriceLevel>);
 
 class PyKalshiBook{
     public:
@@ -33,12 +37,33 @@ class PyKalshiBook{
             }
             return books_->read_snapshot(index);
         }
+
+        FullBookLevels get_full_levels(const std::string& market_ticker) const{
+            size_t index = books_->index_for(market_ticker);
+            if(index == MultiOrderBook::kInvalidIndex){
+                throw std::invalid_argument("market_ticker not tracked: " + market_ticker);
+            }
+            return books_->read_full_levels(index);
+        }
     private:
         std::shared_ptr<MultiOrderBook> books_;
 };
 
 PYBIND11_MODULE(kalshi_orderbook, m){
     m.doc() = "Live kalshi order book, updated on a background C++ thread";
+
+    //Bind PriceLevel
+    py::class_<PriceLevel>(m, "PriceLevel")
+        .def_readonly("price_ticks", &PriceLevel::price_ticks)
+        .def_readonly("size", &PriceLevel::size);
+    
+    //opaque vector wrapper for zero-copy list interface in Python
+    py::bind_vector<std::vector<PriceLevel>>(m, "PriceLevelVector");
+
+    // register FullBookLevels 
+    py::class_<FullBookLevels>(m, "FullBookLevels")
+        .def_readonly("yes_levels", &FullBookLevels::yes_levels)
+        .def_readonly("no_levels", &FullBookLevels::no_levels);
 
     // register the BookTop struct so Python can understand it
     py::class_<BookTop>(m, "BookTop")
@@ -52,6 +77,8 @@ PYBIND11_MODULE(kalshi_orderbook, m){
     py::class_<PyKalshiBook>(m, "OrderBook")    
         .def(py::init<std::vector<std::string>>(), py::arg("market_tickers"))
         .def("get_best_bid_ask", &PyKalshiBook::get_best_bid_ask,
+            py::call_guard<py::gil_scoped_release>())
+        .def("get_full_levels", &PyKalshiBook::get_full_levels,
             py::call_guard<py::gil_scoped_release>());
 }
 
