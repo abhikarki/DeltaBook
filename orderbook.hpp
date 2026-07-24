@@ -61,6 +61,11 @@ struct PriceLevel{
     int64_t size;
 };
 
+struct FullBookLevels{
+    std::vector<PriceLevel> yes_levels;
+    std::vector<PriceLevel> no_levels;
+}
+
 // top levels of book
 struct BookTop{
     int64_t yes_bid = -1, yes_ask = -1;
@@ -112,6 +117,21 @@ class OrderBook{
             return top;
         }   
 
+        FullBookLevels get_full_levels() const{
+            FullBookLevels snap;
+            snap.yes_levels.reserve(yes_.size());
+            snap.no_levels.reserve(no_.size());
+
+            for(auto it = yes_.rbegin(); it != yes_.rend(); it++){
+                snap.yes_levels.push_back(PriceLevel{it->first, it->second});
+            }
+
+            for(auto it = no_.rbegin(); it != no_.rend(); it++){
+                snap.no_levels.push_back(PriceLevel{it->first, it->second});
+            }
+            return snap;
+        }
+
     private:
         // just regular yes no book for now and not the implied book
         std::map<int64_t, int64_t> yes_;
@@ -146,6 +166,11 @@ class SharedOrderBook{
         BookTop read_snapshot() const{
             std::lock_guard<std::mutex> lock(mu_);
             return book_.get_snapshot();
+        }
+
+        FullBookLevels read_full_levels() const {
+            std::lock_guard<std::mutex> lock(mu_);
+            return book_.get_full_levels();
         }
 
         void mark_synced(bool synced){
@@ -208,6 +233,16 @@ class MultiOrderBook{
         BookTop read_snapshot(const std::string& market_ticker) const{
             size_t index = index_for(market_ticker);
             return (index == kInvalidIndex) ? BookTop{} : books_[index]->read_snapshot();
+        }
+
+        FullBookLevels read_full_levels(size_t index) const{
+            if(index >= books_.size()) return FullBookLevels{};
+            return books_[index]->read_full_levels();
+        }
+
+        FullBookLevels read_full_levels(const std::string& market_ticker) const{
+            size_t index = index_for(market_ticker);
+            return (index == kInvalidIndex) ? FullBookLevels{} : books_[index]->read_full_levels();
         }
 
         bool observe_seq(uint64_t seq){
