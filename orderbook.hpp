@@ -64,7 +64,7 @@ struct PriceLevel{
 struct FullBookLevels{
     std::vector<PriceLevel> yes_levels;
     std::vector<PriceLevel> no_levels;
-}
+};
 
 // top levels of book
 struct BookTop{
