@@ -7,6 +7,9 @@
 #include <vector>
 #include <unordered_map>
 #include <memory>
+#include <shared_mutex>
+#include <atomic>
+#include <stdexcept>
 
 constexpr int64_t PRICE_TICKS_PER_DOLLAR = 10000;
 
@@ -77,7 +80,6 @@ class OrderBook{
     public:
         bool is_synced() const {return synced_;}
         uint64_t last_seq() const {return last_seq_;}
-        uint64_t _gap_count() const {return gap_count_;}
 
         void apply_snapshot(const std::vector<PriceLevel>& yes_levels, const std::vector<PriceLevel>& no_levels, uint64_t seq){
             yes_.clear();
@@ -138,16 +140,6 @@ class OrderBook{
         std::map<int64_t, int64_t> no_;
         uint64_t last_seq_ = 0;
         bool synced_ = true;
-        uint64_t gap_count_ = 0;
-
-        // check sequence number for gaps, for now just updating synced_ to false and not refreshing the snapshot
-        void check_seq(uint64_t seq){
-            if(last_seq_ != 0 && seq != last_seq_ + 1){
-                synced_ = false;
-                gap_count_++;
-            }
-            last_seq_ = seq;
-        }
 };
 
 
@@ -178,9 +170,13 @@ class SharedOrderBook{
             book_.mark_synced(synced);
         }
 
+        bool is_active() const {return active_.load(std::memory_order_acquire);}
+        void set_active(bool active) {active_.store(active, std::memory_order_release);}
+
     private:
         mutable std::mutex mu_;
         OrderBook book_;
+        std::atomic<bool> active_{true};
 };
 
 
