@@ -12,11 +12,12 @@
 #include "telemetry.hpp"
 
 struct ParsedUpdate{
-    enum class Type : uint8_t {Snapshot, Delta, Unknown};
+    enum class Type : uint8_t {Snapshot, Delta, TickerActivated, TickerDeactivated, Unknown};
 
     Type type = Type::Unknown;
     size_t book_index = MultiOrderBook::kInvalidIndex;
     uint64_t seq = 0;
+    uint64_t sid = -1;
     uint64_t local_time_ms = 0;
     uint64_t server_time_ms = 0;
 
@@ -26,6 +27,8 @@ struct ParsedUpdate{
     Side side = Side::Yes;
     int64_t price_ticks = 0;
     int64_t size_delta = 0;
+
+    std::string ticker_name;
 };
 
 inline Side parse_side(std::string_view s){
@@ -57,6 +60,7 @@ namespace detail{
     }
 }
 
+// only handle the market data, anything else is handled by parse_control_message()
 inline std::optional<ParsedUpdate> parse_message(const std::string& raw, const MultiOrderBook& books, uint64_t local_time_ms, simdjson::ondemand::parser& parser){
     simdjson::padded_string doc_buf(raw);
 
@@ -91,6 +95,9 @@ inline std::optional<ParsedUpdate> parse_message(const std::string& raw, const M
 
     uint64_t seq = 0;
     if(doc["seq"].get(seq) == simdjson::SUCCESS) update.seq = seq;
+
+    int64_t sid = -1;
+    if(doc["sid"].get(sid) == simdjson::SUCCESS) update.sid = sid;
 
     uint64_t server_ts = 0;
     if(msg["ts_ms"].get(server_ts) == simdjson::SUCCESS) update.server_time_ms = server_ts;
