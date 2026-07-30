@@ -1,4 +1,5 @@
 ## DeltaBook
+DeltaBook is a C++ market data feed handler for the Kalshi WebSocket API. It ingests live exchange updates, maintains an in-memory limit order book, and keeps the data path focused on low-latency parsing and book mutation.
 
 ## Performance Benchmarks
 | Event Metric | Avg(μs) | Minimum(μs) | Maximum(μs) |
