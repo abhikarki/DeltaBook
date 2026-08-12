@@ -184,19 +184,34 @@ class MultiOrderBook{
     public: 
         static constexpr size_t kInvalidIndex = static_cast<size_t>(-1);
 
+        // default max tickers this MultiOrderBook will track. we reserve the capacity up front
+        // so that adding a ticker will not reallocate memory. also, this means we slots are never
+        // reused and we just use active flag to track currently active tickers
+        static constexpr size_t kDefaultMaxTickers = 4096;
+
         MultiOrderBook() = default;
 
-        explicit MultiOrderBook(const std::vector<std::string>& market_tickers){
-            books_.reserve(market_tickers.size());
-            ticker_to_index_.reserve(market_tickers.size());
+        explicit MultiOrderBook(const std::vector<std::string>& market_tickers, size_t max_tickers = kDefaultMaxTickers)
+          : max_tickers(max_tickers){
+            books_.reserve(max_tickers);
             for(auto const& ticker : market_tickers) add_ticker(ticker);
         }
 
-        // no lock for now since it is not part of the hot path
-        // later this will be used when user wants to initialize the market_tickers at beginning at once
+        // register or reactivate a ticker, only the connection thread will call this directly,
+        // others will go through command queue
         size_t add_ticker(const std::string& market_ticker){
+            std::unique_lock lock(registry_mu_);
+
             auto it = ticker_to_index_.find(market_ticker);
-            if(it != ticker_to_index_.end()) return it->second;
+            if(it != ticker_to_index_.end()){
+                // ticker is already registered, so we can just reactivate it
+                books_[it->second]->set_active(true);
+                return it->second;
+            }
+
+            if(books_.size() >= max_tickers){
+                throw std::runtime_error("Already tracking max number of tickers: " + std::to_string(max_tickers));
+            }
 
             size_t index = books_.size();
             books_.push_back(std::make_unique<SharedOrderBook>());
@@ -204,9 +219,28 @@ class MultiOrderBook{
             return index;
         }
 
+        // setting the active flag to false. the slot still remains active
+        bool deactivate_ticker(const std::string& market_ticker){
+            size_t index;
+            {
+                std::shared_lock(registry_mu_);
+                auto it = ticker_to_index_.find(market_ticker);
+                if(it == ticker_to_index.end()) return false;
+                index = it->second;
+            }
+            books_[index]->set_active(false);
+            return true;
+        }
+
         size_t index_for(const std::string& market_ticker) const {
+            std::shared_lock lock(registry_mu_);
             auto it = ticker_to_index_.find(market_ticker);
             return (it == ticker_to_index_.end()) ? kInvalidIndex : it->second;
+        }
+
+        bool is_active(size_t index) const{
+            if(index >= books_size()) return false;
+            return books_[index]->is_active();
         }
 
         size_t size() const {return books_.size();}
@@ -241,20 +275,9 @@ class MultiOrderBook{
             return (index == kInvalidIndex) ? FullBookLevels{} : books_[index]->read_full_levels();
         }
 
-        bool observe_seq(uint64_t seq){
-            std::lock_guard<std::mutex> seq_lock(seq_mu_);
-            bool in_sequence = (last_seq_ == 0) || (seq == last_seq_ + 1);
-            if(seq > last_seq_) last_seq_ = seq;
-            if(!in_sequence) gap_count_++;
-            return in_sequence;
-        }
-
-        uint64_t total_gap_count() const {
-            std::lock_guard<std::mutex> seq_lock(seq_mu_);
-            return gap_count_;
-        }
-
+        // all the tickers ever registered
         std::vector<std::string> tracked_tickers() const{
+            std::shared_lock lock(registry_mu_);
             std::vector<std::string> out(books_.size());
             for(auto const& [ticker, index] : ticker_to_index_) out[index] = ticker;
             return out;
@@ -267,8 +290,6 @@ class MultiOrderBook{
     private:
         std::vector<std::unique_ptr<SharedOrderBook>> books_;
         std::unordered_map<std::string, size_t> ticker_to_index_;
-
-        mutable std::mutex seq_mu_;
-        uint64_t last_seq_ = 0;
-        uint64_t gap_count_ = 0;
+        mutable std::shared_mutex registry_mu_;
+        size_t max_tickers;
 };
