@@ -77,6 +77,32 @@ class PyKalshiBook{
             return books_->tracked_tickers();
         }
 
+        size_t count() const {
+            return books_->size();
+        }
+
+        void dump_status() const {
+            auto tickers = books_->tracked_tickers();
+            std::cout << "[pybind] tracked tickers = [";
+            for(size_t i = 0; i < tickers.size(); i++){
+                if(i) std::cout << ",";
+                std::cout << tickers[i];
+            }
+            std::cout << "]\n";
+
+            for(const auto& ticker : tickers){
+                const size_t index = books_->index_for(ticker);
+                if(index == MultiOrderBook::kInvalidIndex){
+                    continue;
+                }
+
+                const bool active = books_->is_active(index);
+                const BookTop top = books_->read_snapshot(index);
+                std::cout << "[pybind] status " << ticker  << "->active=" << active << " yes_bid= " << top.yes_bid
+                          << "yes_ask=" << top.yes_ask << "no_bid=" << top.no_bid << "no_ask=" << top.no_ask << "synced=" << top.is_synced << "\n";
+            }
+        }
+
         BookTop get_best_bid_ask(const std::string& market_ticker) const {
             size_t index = books_->index_for(market_ticker);
             if(index == MultiOrderBook::kInvalidIndex){
@@ -94,6 +120,7 @@ class PyKalshiBook{
         }
     private:
         std::shared_ptr<MultiOrderBook> books_;
+        std::shared_ptr<KalshiFeedHandle> feed_handle_;
 };
 
 PYBIND11_MODULE(kalshi_orderbook, m){
@@ -123,6 +150,13 @@ PYBIND11_MODULE(kalshi_orderbook, m){
     //register OrderBook Class
     py::class_<PyKalshiBook>(m, "OrderBook")    
         .def(py::init<std::vector<std::string>>(), py::arg("market_tickers"))
+        .def("has_ticker", &PyKalshiBook::has_ticker, py::arg("market_ticker"))
+        .def("is_active", &PyKalshiBook::is_active, py::arg("market_ticker"))
+        .def("add_ticker", &PyKalshiBook::add_ticker, py::arg("market_ticker"))
+        .def("remove_ticker", &PyKalshiBook::remove_ticker, py::arg("market_ticker"))
+        .def("tracked_tickers", &PyKalshiBook::tracked_tickers)
+        .def("count", &PyKalshiBook::count)
+        .def("dump_status", &PyKalshiBook::dump_status)
         .def("get_best_bid_ask", &PyKalshiBook::get_best_bid_ask,
             py::call_guard<py::gil_scoped_release>())
         .def("get_full_levels", &PyKalshiBook::get_full_levels,
